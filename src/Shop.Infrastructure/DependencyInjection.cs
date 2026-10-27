@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using Shop.Application.Catalog;
 using Shop.Domain.Catalog;
 using Shop.Domain.SharedKernel;
 using Shop.Infrastructure.Catalog;
@@ -32,6 +33,7 @@ public static class DependencyInjection
         MongoMappings.Register();
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddSingleton<IProductReadService, ProductReadService>();
         services.AddSingleton<MongoIndexReadiness>();
         services.AddHostedService<MongoIndexInitializer>();
 
@@ -40,4 +42,8 @@ public static class DependencyInjection
 
         return services;
     }
+
+    /// <summary>Registers the idempotent sample-data seeder; call only in Development.</summary>
+    public static IServiceCollection AddCatalogSeeding(this IServiceCollection services) =>
+        services.AddHostedService<CatalogSeeder>();
 }

@@ -23,6 +23,14 @@ Local without Docker: start a MongoDB replica set on `localhost:27017`, then
 dotnet test
 ```
 
+## Catalog search and ordering notes
+
+- `products(filter: { search })` is a case-insensitive substring match (escaped regex) over name and description, max 100
+  characters. The Mongo text index from the spec is created but not used for this query, because `$text` only matches
+  whole words, not substrings.
+- List queries use an English, case-insensitive (strength Secondary) collation so name ordering is natural and keyset
+  cursors stay consistent; as a side effect the `category` filter is case-insensitive.
+
 ## Status
 
 M1 skeleton: placeholder `{ ping }` query only. Catalog and ordering come in later milestones.

@@ -121,6 +121,8 @@ public sealed class MongoIndexInitializer : BackgroundService
                 new CreateIndexModel<Product>(
                     keys.Ascending("category").Ascending("isActive"),
                     new CreateIndexOptions { Name = "ix_products_category_isActive" }),
+                // Spec 6 index. Not used by ListProducts: $text matches whole words only, whereas catalog search is a
+                // case-insensitive substring match (escaped regex) over name/description.
                 new CreateIndexModel<Product>(
                     keys.Text("name").Text("description"),
                     new CreateIndexOptions { Name = "tx_products_name_description" }),

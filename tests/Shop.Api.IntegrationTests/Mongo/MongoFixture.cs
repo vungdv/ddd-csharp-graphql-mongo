@@ -62,6 +62,8 @@ public sealed class MongoFixture : IAsyncLifetime
 
     public IMongoClient Client { get; private set; } = null!;
 
+    public string ConnectionString { get; private set; } = string.Empty;
+
     public async Task InitializeAsync()
     {
         if (!DockerFactAttribute.IsDockerAvailable)
@@ -77,7 +79,8 @@ public sealed class MongoFixture : IAsyncLifetime
         _container = new MongoDbBuilder("mongo:7").Build();
         await _container.StartAsync();
         MongoMappings.Register();
-        Client = new MongoClient(_container.GetConnectionString());
+        ConnectionString = _container.GetConnectionString();
+        Client = new MongoClient(ConnectionString);
     }
 
     public IMongoDatabase NewDatabase() => Client.GetDatabase("shop_" + Guid.NewGuid().ToString("N"));
