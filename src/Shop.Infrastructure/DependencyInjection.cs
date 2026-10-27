@@ -2,6 +2,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using Shop.Domain.Catalog;
+using Shop.Domain.SharedKernel;
+using Shop.Infrastructure.Catalog;
 using Shop.Infrastructure.Mongo;
 
 namespace Shop.Infrastructure;
@@ -26,7 +29,14 @@ public static class DependencyInjection
             return sp.GetRequiredService<IMongoClient>().GetDatabase(options.Database);
         });
 
-        services.AddHealthChecks().AddCheck<MongoHealthCheck>("mongo");
+        MongoMappings.Register();
+        services.AddSingleton<IClock, SystemClock>();
+        services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddSingleton<MongoIndexReadiness>();
+        services.AddHostedService<MongoIndexInitializer>();
+
+        services.AddHealthChecks().AddCheck<MongoHealthCheck>("mongo")
+            .AddCheck<MongoIndexesHealthCheck>("mongo-indexes");
 
         return services;
     }
