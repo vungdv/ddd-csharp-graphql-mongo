@@ -10,18 +10,26 @@ public sealed class ProductRepository : IProductRepository
     public const string CollectionName = "products";
 
     private readonly IMongoCollection<Product> _products;
+    private readonly IMongoSessionProvider? _sessions;
 
-    public ProductRepository(IMongoDatabase database)
+    /// <param name="sessions">When given and a transaction is running, all reads and writes join it.</param>
+    public ProductRepository(IMongoDatabase database, IMongoSessionProvider? sessions = null)
     {
         MongoMappings.Register();
         _products = database.GetCollection<Product>(CollectionName);
+        _sessions = sessions;
     }
 
+    private IClientSessionHandle? Session => _sessions?.Current;
+
+    private IFindFluent<Product, Product> Find(System.Linq.Expressions.Expression<Func<Product, bool>> filter) =>
+        Session is { } s ? _products.Find(s, filter) : _products.Find(filter);
+
     public async Task<Product?> GetById(ProductId id, CancellationToken ct = default) =>
-        await _products.Find(p => p.Id == id).FirstOrDefaultAsync(ct);
+        await Find(p => p.Id == id).FirstOrDefaultAsync(ct);
 
     public async Task<Product?> GetBySku(Sku sku, CancellationToken ct = default) =>
-        await _products.Find(p => p.Sku == sku).FirstOrDefaultAsync(ct);
+        await Find(p => p.Sku == sku).FirstOrDefaultAsync(ct);
 
     public async Task<IReadOnlyList<Product>> GetByIds(IEnumerable<ProductId> ids, CancellationToken ct = default)
     {
@@ -31,17 +39,25 @@ public sealed class ProductRepository : IProductRepository
             return [];
         }
 
-        return await _products.Find(Builders<Product>.Filter.In(p => p.Id, list)).ToListAsync(ct);
+        var filter = Builders<Product>.Filter.In(p => p.Id, list);
+        return await (Session is { } s ? _products.Find(s, filter) : _products.Find(filter)).ToListAsync(ct);
     }
 
     public Task<bool> ExistsBySku(Sku sku, CancellationToken ct = default) =>
-        _products.Find(p => p.Sku == sku).AnyAsync(ct);
+        Find(p => p.Sku == sku).AnyAsync(ct);
 
     public async Task Add(Product product, CancellationToken ct = default)
     {
         try
         {
-            await _products.InsertOneAsync(product, cancellationToken: ct);
+            if (Session is { } s)
+            {
+                await _products.InsertOneAsync(s, product, cancellationToken: ct);
+            }
+            else
+            {
+                await _products.InsertOneAsync(product, cancellationToken: ct);
+            }
         }
         catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
         {
@@ -55,6 +71,7 @@ public sealed class ProductRepository : IProductRepository
     public Task Update(Product product, CancellationToken ct = default) =>
         OptimisticConcurrency.Replace<Product, ProductId>(
             _products,
+            Session,
             product,
             "Product",
             ex => ex.WriteError.Category == ServerErrorCategory.DuplicateKey

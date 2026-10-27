@@ -1,6 +1,8 @@
 using Shop.Api.GraphQL.Catalog;
 using Shop.Api.GraphQL.Catalog.Types;
 using Shop.Api.GraphQL.Common;
+using Shop.Api.GraphQL.Ordering;
+using Shop.Api.GraphQL.Ordering.Types;
 using Shop.Application;
 using Shop.Infrastructure;
 
@@ -27,6 +29,12 @@ builder.Services
     .AddMutationType()
     .AddTypeExtension<ProductQueries>()
     .AddTypeExtension<ProductMutations>()
+    .AddTypeExtension<OrderQueries>()
+    .AddTypeExtension<OrderMutations>()
+    .AddType<OrderType>()
+    .AddType<OrderLineType>()
+    .AddType<CustomerType>()
+    .AddType<AddressType>()
     .AddType<ProductType>()
     .AddType<MoneyType>()
     .AddDataLoader<ProductByIdDataLoader>()

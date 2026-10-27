@@ -31,6 +31,12 @@ dotnet test
 - List queries use an English, case-insensitive (strength Secondary) collation so name ordering is natural and keyset
   cursors stay consistent; as a side effect the `category` filter is case-insensitive.
 
+## Known v1 limitations
+
+- Cancelling an order and restoring its stock are not atomic: the order is saved first and the `OrderCancelled` handler
+  restores stock afterwards. A restore failure is logged and not retried beyond a bounded conflict retry; an outbox
+  would close this gap.
+
 ## Status
 
 M1 skeleton: placeholder `{ ping }` query only. Catalog and ordering come in later milestones.

@@ -12,6 +12,7 @@ internal static class OptimisticConcurrency
 {
     public static async Task Replace<TAggregate, TId>(
         IMongoCollection<TAggregate> collection,
+        IClientSessionHandle? session,
         TAggregate aggregate,
         string aggregateName,
         Func<MongoWriteException, DomainException?> mapWriteError,
@@ -27,10 +28,11 @@ internal static class OptimisticConcurrency
         setVersion(aggregate, expected + 1);
         try
         {
-            var result = await collection.ReplaceOneAsync(
-                a => a.Id.Equals(aggregate.Id) && a.Version == expected,
-                aggregate,
-                cancellationToken: ct);
+            System.Linq.Expressions.Expression<Func<TAggregate, bool>> filter =
+                a => a.Id.Equals(aggregate.Id) && a.Version == expected;
+            var result = session is null
+                ? await collection.ReplaceOneAsync(filter, aggregate, cancellationToken: ct)
+                : await collection.ReplaceOneAsync(session, filter, aggregate, cancellationToken: ct);
 
             if (result.MatchedCount == 0)
             {

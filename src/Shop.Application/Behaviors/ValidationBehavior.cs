@@ -23,6 +23,7 @@ public sealed class ValidationBehavior<TRequest, TResponse>(IEnumerable<IValidat
         return failures.Count > 0 ? Result<TResponse>.Failure(failures) : await next();
     }
 
-    private static string ToCamelCase(string name) =>
-        name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name[1..];
+    /// <summary>Camel-cases every path segment so nested names match input names, e.g. <c>Lines[0].ProductId</c> -> <c>lines[0].productId</c>.</summary>
+    internal static string ToCamelCase(string name) =>
+        string.Join('.', name.Split('.').Select(s => s.Length == 0 ? s : char.ToLowerInvariant(s[0]) + s[1..]));
 }

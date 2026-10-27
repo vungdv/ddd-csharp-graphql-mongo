@@ -2,7 +2,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using Shop.Application.Abstractions;
 using Shop.Application.Catalog;
+using Shop.Application.Ordering;
 using Shop.Domain.Catalog;
 using Shop.Domain.Ordering;
 using Shop.Domain.SharedKernel;
@@ -34,9 +36,13 @@ public static class DependencyInjection
 
         MongoMappings.Register();
         services.AddSingleton<IClock, SystemClock>();
+        services.AddScoped<MongoUnitOfWork>();
+        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<MongoUnitOfWork>());
+        services.AddScoped<IMongoSessionProvider>(sp => sp.GetRequiredService<MongoUnitOfWork>());
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddSingleton<IProductReadService, ProductReadService>();
+        services.AddSingleton<IOrderReadService, OrderReadService>();
         services.AddSingleton<MongoIndexReadiness>();
         services.AddHostedService<MongoIndexInitializer>();
 

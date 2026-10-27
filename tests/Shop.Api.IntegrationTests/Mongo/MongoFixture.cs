@@ -76,7 +76,7 @@ public sealed class MongoFixture : IAsyncLifetime
             return; // [DockerFact] tests are skipped and never touch Client.
         }
 
-        _container = new MongoDbBuilder("mongo:7").Build();
+        _container = new MongoDbBuilder("mongo:7").WithReplicaSet().Build();
         await _container.StartAsync();
         MongoMappings.Register();
         ConnectionString = _container.GetConnectionString();
