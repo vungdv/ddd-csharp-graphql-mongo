@@ -1,4 +1,3 @@
-using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using Shop.Domain.Catalog;
 using Shop.Domain.SharedKernel;
@@ -53,41 +52,16 @@ public sealed class ProductRepository : IProductRepository
         }
     }
 
-    public async Task Update(Product product, CancellationToken ct = default)
-    {
-        var expected = product.Version;
-        var setVersion = BsonClassMap.LookupClassMap(typeof(Product)).AllMemberMaps
-            .Single(m => m.MemberName == nameof(Product.Version)).Setter;
-
-        // The replacement document carries the incremented version.
-        setVersion(product, expected + 1);
-        try
-        {
-            var result = await _products.ReplaceOneAsync(
-                p => p.Id == product.Id && p.Version == expected,
-                product,
-                cancellationToken: ct);
-
-            if (result.MatchedCount == 0)
-            {
-                setVersion(product, expected);
-                throw new DomainException(
-                    DomainErrorCodes.ConcurrencyConflict,
-                    $"Product {product.Id} was modified concurrently or no longer exists.");
-            }
-        }
-        catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
-        {
-            setVersion(product, expected);
-            throw new DomainException(
-                DomainErrorCodes.ProductSkuAlreadyExists,
-                $"A product with SKU '{product.Sku}' already exists.",
-                "sku");
-        }
-        catch (Exception) when (product.Version != expected)
-        {
-            setVersion(product, expected);
-            throw;
-        }
-    }
+    public Task Update(Product product, CancellationToken ct = default) =>
+        OptimisticConcurrency.Replace<Product, ProductId>(
+            _products,
+            product,
+            "Product",
+            ex => ex.WriteError.Category == ServerErrorCategory.DuplicateKey
+                ? new DomainException(
+                    DomainErrorCodes.ProductSkuAlreadyExists,
+                    $"A product with SKU '{product.Sku}' already exists.",
+                    "sku")
+                : null,
+            ct);
 }

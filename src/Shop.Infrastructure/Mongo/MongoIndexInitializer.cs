@@ -3,7 +3,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using Shop.Domain.Catalog;
+using Shop.Domain.Ordering;
 using Shop.Infrastructure.Catalog;
+using Shop.Infrastructure.Ordering;
 
 namespace Shop.Infrastructure.Mongo;
 
@@ -126,6 +128,23 @@ public sealed class MongoIndexInitializer : BackgroundService
                 new CreateIndexModel<Product>(
                     keys.Text("name").Text("description"),
                     new CreateIndexOptions { Name = "tx_products_name_description" }),
+            ],
+            ct);
+
+        var orders = database.GetCollection<Order>(OrderRepository.CollectionName);
+        var orderKeys = Builders<Order>.IndexKeys;
+
+        await orders.Indexes.CreateManyAsync(
+            [
+                new CreateIndexModel<Order>(
+                    orderKeys.Ascending("orderNumber"),
+                    new CreateIndexOptions { Name = "ux_orders_orderNumber", Unique = true }),
+                new CreateIndexModel<Order>(
+                    orderKeys.Ascending("customer.email").Descending("placedAt"),
+                    new CreateIndexOptions { Name = "ix_orders_customerEmail_placedAt" }),
+                new CreateIndexModel<Order>(
+                    orderKeys.Ascending("status").Descending("placedAt"),
+                    new CreateIndexOptions { Name = "ix_orders_status_placedAt" }),
             ],
             ct);
     }

@@ -4,9 +4,11 @@ using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using Shop.Application.Catalog;
 using Shop.Domain.Catalog;
+using Shop.Domain.Ordering;
 using Shop.Domain.SharedKernel;
 using Shop.Infrastructure.Catalog;
 using Shop.Infrastructure.Mongo;
+using Shop.Infrastructure.Ordering;
 
 namespace Shop.Infrastructure;
 
@@ -33,6 +35,7 @@ public static class DependencyInjection
         MongoMappings.Register();
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddSingleton<IProductReadService, ProductReadService>();
         services.AddSingleton<MongoIndexReadiness>();
         services.AddHostedService<MongoIndexInitializer>();
