@@ -200,10 +200,34 @@ public class OrderRepositoryTests(MongoFixture fixture)
         var indexes = await (await db.GetCollection<BsonDocument>(OrderRepository.CollectionName).Indexes.ListAsync()).ToListAsync();
         var byName = indexes.ToDictionary(i => i["name"].AsString);
 
-        byName.Keys.Should().Contain(["ux_orders_orderNumber", "ix_orders_customerEmail_placedAt", "ix_orders_status_placedAt"]);
+        byName.Keys.Should().Contain(["ux_orders_orderNumber", "ix_orders_customerEmail_placedAt", "ix_orders_status_placedAt", "ix_orders_placedAt__id"]);
         byName["ux_orders_orderNumber"]["unique"].AsBoolean.Should().BeTrue();
         byName["ux_orders_orderNumber"]["key"].AsBsonDocument.Should().Equal(new BsonDocument("orderNumber", 1));
         byName["ix_orders_customerEmail_placedAt"]["key"].AsBsonDocument.Should().Equal(new BsonDocument { { "customer.email", 1 }, { "placedAt", -1 } });
         byName["ix_orders_status_placedAt"]["key"].AsBsonDocument.Should().Equal(new BsonDocument { { "status", 1 }, { "placedAt", -1 } });
+        byName["ix_orders_placedAt__id"]["key"].AsBsonDocument.Should().Equal(new BsonDocument { { "placedAt", -1 }, { "_id", -1 } });
+    }
+
+    [DockerFact]
+    public async Task Default_order_listing_sort_is_served_by_the_placedAt_id_index_without_in_memory_sort()
+    {
+        var (db, _) = await Arrange();
+        await MongoIndexInitializer.EnsureIndexes(db);
+
+        var explain = await db.RunCommandAsync<BsonDocument>(new BsonDocument
+        {
+            {
+                "explain", new BsonDocument
+                {
+                    { "find", OrderRepository.CollectionName },
+                    { "sort", new BsonDocument { { "placedAt", -1 }, { "_id", -1 } } },
+                    { "limit", 20 },
+                }
+            },
+            { "verbosity", "queryPlanner" },
+        });
+
+        var plan = explain["queryPlanner"]["winningPlan"].ToJson();
+        plan.Should().Contain("IXSCAN").And.Contain("ix_orders_placedAt__id").And.NotContain("\"SORT\"");
     }
 }

@@ -19,7 +19,7 @@ public sealed class ProductReadService : IProductReadService
     /// Case-insensitive (strength Secondary) English collation for list queries: gives natural name ordering and keeps
     /// keyset comparisons consistent with the sort. Side effect: the exact-match category filter is case-insensitive too.
     /// </summary>
-    private static readonly Collation NaturalOrder = new("en", strength: CollationStrength.Secondary);
+    internal static readonly Collation NaturalOrder = new("en", strength: CollationStrength.Secondary);
 
     private static readonly FilterDefinitionBuilder<BsonDocument> F = Builders<BsonDocument>.Filter;
 

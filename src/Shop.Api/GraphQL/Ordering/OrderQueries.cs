@@ -1,3 +1,4 @@
+using HotChocolate.CostAnalysis.Types;
 using Shop.Api.GraphQL.Common;
 using Shop.Api.GraphQL.Ordering.Inputs;
 using Shop.Api.GraphQL.Ordering.Types;
@@ -22,6 +23,8 @@ public sealed class OrderQueries
     public async Task<OrderDto?> OrderByNumber(string orderNumber, IDispatcher dispatcher, CancellationToken ct) =>
         (await dispatcher.Send(new GetOrderByNumberQuery(orderNumber), ct)).ValueOrThrow();
 
+    // Cost analysis: the page size is the "first" argument (default 20, capped at 100 by the handler).
+    [ListSize(AssumedSize = 100, SlicingArguments = ["first"], SizedFields = ["edges"], RequireOneSlicingArgument = false)]
     public async Task<OrderConnection> Orders(
         IDispatcher dispatcher,
         CancellationToken ct,

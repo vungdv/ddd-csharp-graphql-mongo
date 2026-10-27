@@ -56,6 +56,22 @@ public sealed class DockerFactAttribute : FactAttribute
     }
 }
 
+public sealed class DockerTheoryAttribute : TheoryAttribute
+{
+    public DockerTheoryAttribute()
+    {
+        if (!DockerFactAttribute.IsDockerAvailable)
+        {
+            if (DockerFactAttribute.RequireDocker)
+            {
+                throw new InvalidOperationException("REQUIRE_DOCKER=1 is set but Docker is not available.");
+            }
+
+            Skip = "Docker is not available; Testcontainers MongoDB tests were skipped.";
+        }
+    }
+}
+
 public sealed class MongoFixture : IAsyncLifetime
 {
     private MongoDbContainer? _container;

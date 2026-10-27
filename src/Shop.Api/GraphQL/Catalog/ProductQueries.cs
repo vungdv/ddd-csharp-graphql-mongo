@@ -1,3 +1,4 @@
+using HotChocolate.CostAnalysis.Types;
 using Shop.Api.GraphQL.Catalog.Inputs;
 using Shop.Api.GraphQL.Catalog.Types;
 using Shop.Api.GraphQL.Common;
@@ -20,6 +21,8 @@ public sealed class ProductQueries
     public async Task<ProductDto?> ProductBySku(string sku, IDispatcher dispatcher, CancellationToken ct) =>
         (await dispatcher.Send(new GetProductBySkuQuery(sku), ct)).ValueOrThrow();
 
+    // Cost analysis: the page size is the "first" argument (default 20, capped at 100 by the handler).
+    [ListSize(AssumedSize = 100, SlicingArguments = ["first"], SizedFields = ["edges"], RequireOneSlicingArgument = false)]
     public async Task<ProductConnection> Products(
         IDispatcher dispatcher,
         CancellationToken ct,

@@ -13,12 +13,12 @@ services:
         - --quiet
         - --eval
         - |
-          try {
-            if (db.hello().isWritablePrimary) { quit(0); }
-          } catch (e) {
-            try { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongo:27017'}]}); } catch (e2) {}
+          const h = db.hello();
+          if (h.isWritablePrimary) { quit(0); }
+          if (!h.setName) {
+            try { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongo:27017'}]}); } catch (e) {}
           }
-          quit(db.hello().isWritablePrimary ? 0 : 1);
+          quit(1);
       interval: 5s
       timeout: 10s
       retries: 20

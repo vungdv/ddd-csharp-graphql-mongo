@@ -115,6 +115,9 @@ public sealed class MongoIndexInitializer : BackgroundService
         var products = database.GetCollection<Product>(ProductRepository.CollectionName);
         var keys = Builders<Product>.IndexKeys;
 
+        // Replaced by the collated ix_products_category_isActive_en (same name, different options would conflict).
+        await DropIndexIfExists(products, "ix_products_category_isActive", ct);
+
         await products.Indexes.CreateManyAsync(
             [
                 new CreateIndexModel<Product>(
@@ -122,12 +125,23 @@ public sealed class MongoIndexInitializer : BackgroundService
                     new CreateIndexOptions { Name = "ux_products_sku", Unique = true }),
                 new CreateIndexModel<Product>(
                     keys.Ascending("category").Ascending("isActive"),
-                    new CreateIndexOptions { Name = "ix_products_category_isActive" }),
+                    new CreateIndexOptions { Name = "ix_products_category_isActive_en", Collation = ProductReadService.NaturalOrder }),
                 // Spec 6 index. Not used by ListProducts: $text matches whole words only, whereas catalog search is a
                 // case-insensitive substring match (escaped regex) over name/description.
                 new CreateIndexModel<Product>(
                     keys.Text("name").Text("description"),
                     new CreateIndexOptions { Name = "tx_products_name_description" }),
+                // Sort-supporting indexes for ListProducts. Queries run with ProductReadService.NaturalOrder, and MongoDB only
+                // uses an index for a collated query/sort when the index has the same collation, so these carry it too.
+                new CreateIndexModel<Product>(
+                    keys.Ascending("name").Ascending("_id"),
+                    new CreateIndexOptions { Name = "ix_products_name__id", Collation = ProductReadService.NaturalOrder }),
+                new CreateIndexModel<Product>(
+                    keys.Ascending("price.amount").Ascending("_id"),
+                    new CreateIndexOptions { Name = "ix_products_price_amount__id", Collation = ProductReadService.NaturalOrder }),
+                new CreateIndexModel<Product>(
+                    keys.Ascending("createdAt").Ascending("_id"),
+                    new CreateIndexOptions { Name = "ix_products_createdAt__id", Collation = ProductReadService.NaturalOrder }),
             ],
             ct);
 
@@ -145,7 +159,23 @@ public sealed class MongoIndexInitializer : BackgroundService
                 new CreateIndexModel<Order>(
                     orderKeys.Ascending("status").Descending("placedAt"),
                     new CreateIndexOptions { Name = "ix_orders_status_placedAt" }),
+                // Default ListOrders sort: placedAt desc, _id desc (keyset cursor).
+                new CreateIndexModel<Order>(
+                    orderKeys.Descending("placedAt").Descending("_id"),
+                    new CreateIndexOptions { Name = "ix_orders_placedAt__id" }),
             ],
             ct);
+    }
+
+    private static async Task DropIndexIfExists<T>(IMongoCollection<T> collection, string name, CancellationToken ct)
+    {
+        try
+        {
+            await collection.Indexes.DropOneAsync(name, ct);
+        }
+        catch (MongoCommandException ex) when (ex.CodeName is "IndexNotFound" or "NamespaceNotFound")
+        {
+            // Nothing to drop.
+        }
     }
 }

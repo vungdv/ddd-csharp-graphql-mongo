@@ -14,15 +14,19 @@ public sealed class ApiHost : IDisposable
     private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
 
-    public ApiHost(MongoFixture mongo, Action<IServiceCollection>? configureServices = null)
+    public ApiHost(MongoFixture mongo, Action<IServiceCollection>? configureServices = null, string environment = "Testing", IReadOnlyDictionary<string, string>? settings = null)
     {
         var database = "shop_" + Guid.NewGuid().ToString("N");
         var connection = mongo.ConnectionString;
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
-            b.UseEnvironment("Testing");
+            b.UseEnvironment(environment);
             b.UseSetting("Mongo:ConnectionString", connection);
             b.UseSetting("Mongo:Database", database);
+            foreach (var (key, value) in settings ?? new Dictionary<string, string>())
+            {
+                b.UseSetting(key, value);
+            }
             if (configureServices is not null)
             {
                 b.ConfigureServices(configureServices);
@@ -30,6 +34,8 @@ public sealed class ApiHost : IDisposable
         });
         _client = _factory.CreateClient();
     }
+
+    public HttpClient Client => _client;
 
     public IServiceProvider Services => _factory.Services;
 

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using HotChocolate;
+using Shop.Api.Observability;
 
 namespace Shop.Api.GraphQL.Common;
 
@@ -20,7 +21,10 @@ public sealed class UnexpectedErrorFilter(ILogger<UnexpectedErrorFilter> logger)
             return error;
         }
 
-        var traceId = Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString("N");
+        var activity = Activity.Current;
+        var traceId = activity?.TraceId.ToString() ?? Guid.NewGuid().ToString("N");
+        activity.RecordFailure(error.Exception);
+        ShopTelemetry.UnexpectedErrors.Add(1);
         logger.LogError(error.Exception, "Unhandled GraphQL exception. traceId={TraceId} path={Path}", traceId, error.Path?.Print());
 
         return ErrorBuilder.New()

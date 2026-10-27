@@ -168,9 +168,91 @@ public class ProductRepositoryTests(MongoFixture fixture)
         var indexes = await (await db.GetCollection<BsonDocument>("products").Indexes.ListAsync()).ToListAsync();
 
         var byName = indexes.ToDictionary(i => i["name"].AsString);
-        byName.Keys.Should().Contain(["ux_products_sku", "ix_products_category_isActive", "tx_products_name_description"]);
+        byName.Keys.Should().Contain(["ux_products_sku", "ix_products_category_isActive_en", "tx_products_name_description"]);
         byName["ux_products_sku"]["unique"].AsBoolean.Should().BeTrue();
-        byName["ix_products_category_isActive"]["key"].AsBsonDocument.Names.Should().Equal("category", "isActive");
+        byName["ix_products_category_isActive_en"]["key"].AsBsonDocument.Names.Should().Equal("category", "isActive");
+        byName["ix_products_category_isActive_en"]["collation"]["locale"].AsString.Should().Be("en");
+        byName["ix_products_category_isActive_en"]["collation"]["strength"].AsInt32.Should().Be(2);
+        byName.Keys.Should().NotContain("ix_products_category_isActive");
         byName["tx_products_name_description"]["weights"].AsBsonDocument.Names.Should().BeEquivalentTo("name", "description");
+
+        // Sort-supporting indexes carry the same collation as ProductReadService's list queries (en, strength 2).
+        foreach (var (name, first) in new[]
+                 {
+                     ("ix_products_name__id", "name"),
+                     ("ix_products_price_amount__id", "price.amount"),
+                     ("ix_products_createdAt__id", "createdAt"),
+                 })
+        {
+            byName.Should().ContainKey(name);
+            byName[name]["key"].AsBsonDocument.Names.Should().Equal(first, "_id");
+            byName[name]["collation"]["locale"].AsString.Should().Be("en");
+            byName[name]["collation"]["strength"].AsInt32.Should().Be(2);
+        }
+    }
+
+    [DockerTheory]
+    [InlineData("name", "ix_products_name__id")]
+    [InlineData("price.amount", "ix_products_price_amount__id")]
+    [InlineData("createdAt", "ix_products_createdAt__id")]
+    public async Task Collated_sorted_list_queries_are_served_by_the_sort_indexes_without_in_memory_sort(string sortPath, string indexName)
+    {
+        var (db, _) = await Arrange();
+        await MongoIndexInitializer.EnsureIndexes(db);
+
+        var explain = await db.RunCommandAsync<BsonDocument>(new BsonDocument
+        {
+            {
+                "explain", new BsonDocument
+                {
+                    { "find", "products" },
+                    { "sort", new BsonDocument { { sortPath, 1 }, { "_id", 1 } } },
+                    { "limit", 20 },
+                    { "collation", new BsonDocument { { "locale", "en" }, { "strength", 2 } } },
+                }
+            },
+            { "verbosity", "queryPlanner" },
+        });
+
+        var plan = explain["queryPlanner"]["winningPlan"].ToJson();
+        plan.Should().Contain("IXSCAN").And.Contain(indexName).And.NotContain("\"SORT\"");
+    }
+
+    [DockerFact]
+    public async Task Legacy_uncollated_category_index_is_dropped_and_replaced()
+    {
+        var (db, _) = await Arrange();
+        var products = db.GetCollection<BsonDocument>("products");
+        await products.Indexes.CreateOneAsync(new CreateIndexModel<BsonDocument>(
+            new BsonDocument { { "category", 1 }, { "isActive", 1 } },
+            new CreateIndexOptions { Name = "ix_products_category_isActive" }));
+
+        await MongoIndexInitializer.EnsureIndexes(db);
+
+        var names = (await (await products.Indexes.ListAsync()).ToListAsync()).Select(i => i["name"].AsString).ToList();
+        names.Should().Contain("ix_products_category_isActive_en").And.NotContain("ix_products_category_isActive");
+    }
+
+    [DockerFact]
+    public async Task Collated_category_and_active_filter_is_served_by_the_category_index()
+    {
+        var (db, _) = await Arrange();
+        await MongoIndexInitializer.EnsureIndexes(db);
+
+        var explain = await db.RunCommandAsync<BsonDocument>(new BsonDocument
+        {
+            {
+                "explain", new BsonDocument
+                {
+                    { "find", "products" },
+                    { "filter", new BsonDocument { { "category", "Apparel" }, { "isActive", true } } },
+                    { "collation", new BsonDocument { { "locale", "en" }, { "strength", 2 } } },
+                }
+            },
+            { "verbosity", "queryPlanner" },
+        });
+
+        var plan = explain["queryPlanner"]["winningPlan"].ToJson();
+        plan.Should().Contain("IXSCAN").And.Contain("ix_products_category_isActive_en");
     }
 }
