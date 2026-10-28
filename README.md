@@ -1,11 +1,11 @@
-# Shop
-
-DDD demo: GraphQL (HotChocolate) + MongoDB on .NET 10. Spec: `specs/initial-spec.md`.
-
-***Notice***
+***Notice***:
 All the code here are AI generated except the two files: 
 - AGENTS.md
 - Goal & Scope in the initial-spec.md
+
+# Shop
+
+DDD demo: GraphQL (HotChocolate) + MongoDB on .NET 10. Spec: `specs/initial-spec.md`.
 
 ## Run
 
